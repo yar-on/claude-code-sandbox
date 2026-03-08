@@ -3,9 +3,10 @@ import { type Command } from 'commander';
 import { logger } from '../utils/logger.js';
 import { DEFAULT_CONFIG_DIR } from './constants.js';
 import { withEscBack } from './prompt-utils.js';
-import { loadConfig } from './config-store.js';
-import { findContainerById } from './container-store.js';
+import { loadConfig, type ConfigFile } from './config-store.js';
+import { findContainerById, getAllContainers } from './container-store.js';
 import { resolveWorkspace } from './workspace.js';
+import { formatContainerLine } from './selection.js';
 
 // Lazy-load @inquirer/prompts to avoid bundling CJS deps into the ESM top-level scope.
 // (Same pattern as selection.ts — resolves the "Dynamic require of tty" esbuild issue.)
@@ -17,12 +18,36 @@ export interface GlobalOpts {
     id?: string;
 }
 
-export function buildGlobalFlags(opts: GlobalOpts): string[] {
+const globalOpts: GlobalOpts = {
+    configDir: DEFAULT_CONFIG_DIR,
+    workspace: undefined,
+    id: undefined,
+};
+
+export function buildGlobalFlags(): string[] {
     const flags: string[] = [];
-    if (opts.configDir !== DEFAULT_CONFIG_DIR) flags.push('--config-dir', opts.configDir);
-    if (opts.workspace) flags.push('--workspace', opts.workspace);
-    if (opts.id) flags.push('--id', opts.id);
+    if (globalOpts.configDir !== DEFAULT_CONFIG_DIR) flags.push('--config-dir', globalOpts.configDir);
+    if (globalOpts.workspace) flags.push('--workspace', globalOpts.workspace);
+    if (globalOpts.id) flags.push('--id', globalOpts.id);
     return flags;
+}
+
+export const CONTAINER_UNSET = '__unset__';
+
+const EXCLUDED_STATUSES = new Set(['unknown', 'removed']);
+
+export async function promptContainerSelect(config: ConfigFile, currentId: string | null): Promise<string | null> {
+    const { select } = await getPrompts();
+
+    const containers = getAllContainers(config)
+        .filter((c) => c.removedAt === null && !EXCLUDED_STATUSES.has(c.lastStatus))
+        .sort((a, b) => (a.lastStatus === 'running' ? -1 : b.lastStatus === 'running' ? 1 : 0));
+
+    const choices = [{ name: chalk.dim('None (unset)'), value: CONTAINER_UNSET }, ...containers.map((c) => ({ name: formatContainerLine(c), value: c.id }))];
+
+    const chosen = await withEscBack((s) => select<string>({ message: 'Select container:', choices, default: currentId ?? CONTAINER_UNSET }, { signal: s }));
+
+    return chosen === CONTAINER_UNSET ? null : chosen;
 }
 
 const CONFIG_KEYS = [
@@ -71,42 +96,70 @@ export async function promptConfigReset(): Promise<string[]> {
  */
 export async function promptMainMenu(program: Command): Promise<string[] | null> {
     const { select, Separator } = await getPrompts();
-    const choice = await withEscBack((s) =>
-        select<string>(
-            {
-                message: 'Select an action:',
-                choices: [
-                    new Separator('── Container Lifecycle ──'),
-                    { name: 'Start container', value: 'start' },
-                    { name: 'Stop container', value: 'stop' },
-                    { name: 'Start all stopped containers', value: 'start-all' },
-                    { name: 'Stop all running containers', value: 'stop-all' },
-                    { name: 'Remove a container', value: 'remove' },
-                    new Separator('── Attach & Shell ──'),
-                    { name: 'Attach to Claude Code process', value: 'attach' },
-                    { name: 'Open bash session', value: 'shell' },
-                    new Separator('── Inspect ──'),
-                    { name: 'List containers', value: 'ls' },
-                    { name: 'List all history (including removed)', value: 'history' },
-                    new Separator('── Selection ──'),
-                    { name: 'Select active container', value: 'use' },
-                    { name: 'Clear active container selection', value: 'use-clear' },
-                    new Separator('── Authentication ──'),
-                    { name: 'Auth setup wizard', value: 'auth-setup' },
-                    { name: 'Auth status', value: 'auth-status' },
-                    new Separator('── Configuration ──'),
-                    { name: 'List settings', value: 'config-list' },
-                    { name: 'Get a setting', value: 'config-get' },
-                    { name: 'Set a setting', value: 'config-set' },
-                    { name: 'Reset settings', value: 'config-reset' },
-                    new Separator('──'),
-                    { name: 'Show help', value: '__help__' },
-                    { name: 'Exit', value: '__exit__' },
-                ],
-            },
-            { signal: s }
-        )
-    );
+
+    const choice = await withEscBack((s) => {
+        if (!globalOpts.id) {
+            return select<string>(
+                {
+                    message: 'Select an action:',
+                    choices: [
+                        new Separator('── Container Management ──'),
+                        { name: 'Select active container', value: 'use' },
+                        { name: `Start ${globalOpts.id ? 'selected' : 'new'} container`, value: 'start' },
+                        { name: 'List containers', value: 'ls' },
+                        { name: 'List all history (including removed)', value: 'history' },
+                        new Separator('── Container Bulk Lifecycle ──'),
+                        { name: 'Start all stopped containers', value: 'start-all' },
+                        { name: 'Stop all running containers', value: 'stop-all' },
+                        new Separator('── Authentication ──'),
+                        { name: 'Auth setup wizard', value: 'auth-setup' },
+                        { name: 'Auth status', value: 'auth-status' },
+                        new Separator('── Configuration ──'),
+                        { name: 'List settings', value: 'config-list' },
+                        { name: 'Get a setting', value: 'config-get' },
+                        { name: 'Set a setting', value: 'config-set' },
+                        { name: 'Reset settings', value: 'config-reset' },
+                        new Separator('──'),
+                        { name: 'Show help', value: '__help__' },
+                        { name: 'Exit', value: '__exit__' },
+                    ],
+                },
+                { signal: s }
+            );
+        } else {
+            return select<string>(
+                {
+                    message: 'Select an action:',
+                    choices: [
+                        new Separator('── Container Management ──'),
+                        { name: 'Select active container', value: 'use' },
+                        { name: `Start ${globalOpts.id ? 'selected' : 'new'} container`, value: 'start' },
+                        { name: 'Stop selected container', value: 'stop' },
+                        { name: 'Remove selected container', value: 'remove' },
+                        { name: 'Attach to Claude Code process', value: 'attach' },
+                        { name: 'Open bash session', value: 'shell' },
+                        { name: 'List containers', value: 'ls' },
+                        { name: 'List all history (including removed)', value: 'history' },
+                        new Separator('── Container Bulk Lifecycle ──'),
+                        { name: 'Start all stopped containers', value: 'start-all' },
+                        { name: 'Stop all running containers', value: 'stop-all' },
+                        new Separator('── Authentication ──'),
+                        { name: 'Auth setup wizard', value: 'auth-setup' },
+                        { name: 'Auth status', value: 'auth-status' },
+                        new Separator('── Configuration ──'),
+                        { name: 'List settings', value: 'config-list' },
+                        { name: 'Get a setting', value: 'config-get' },
+                        { name: 'Set a setting', value: 'config-set' },
+                        { name: 'Reset settings', value: 'config-reset' },
+                        new Separator('──'),
+                        { name: 'Show help', value: '__help__' },
+                        { name: 'Exit', value: '__exit__' },
+                    ],
+                },
+                { signal: s }
+            );
+        }
+    });
 
     switch (choice) {
         case '__exit__':
@@ -197,21 +250,30 @@ async function pressAnyKey(): Promise<void> {
     process.stdout.write('\n');
 }
 
-export async function runInteractiveMode(program: Command, globalOpts: GlobalOpts): Promise<void> {
+export async function runInteractiveMode(program: Command, opts: GlobalOpts): Promise<void> {
     if (!process.stdin.isTTY) {
         program.help();
         return;
     }
 
+    globalOpts.id = opts.id;
+    globalOpts.workspace = opts.workspace;
+    globalOpts.configDir = opts.configDir;
+
     while (true) {
         logger.blank();
-        console.log(chalk.bold('  Claude Code Sandbox — Interactive Mode'));
+        const cliVersion = program.version() ?? 'unknown';
+        console.log(chalk.bold(`  Claude Code Sandbox CLI (${cliVersion}) — Interactive Mode`));
 
         const config = loadConfig(globalOpts.configDir);
-        const selectedId = globalOpts.id ?? config.settings.currentContainerId ?? null;
-        const selectedContainer = selectedId ? findContainerById(config, selectedId) : null;
+        const currentId = globalOpts.id ?? null;
+        const selectedContainer = currentId ? findContainerById(config, currentId) : null;
         const shortId = selectedContainer ? selectedContainer.id.replace(/-/g, '').slice(0, 8) : null;
         const workspace = selectedContainer ? selectedContainer.workspace : resolveWorkspace(globalOpts.workspace);
+
+        if (!selectedContainer) {
+            globalOpts.id = undefined;
+        }
 
         console.log(chalk.gray('  Container : ') + (shortId ? chalk.cyan(shortId) : chalk.dim('none')));
         console.log(chalk.gray('  Workspace : ') + chalk.cyan(workspace));
@@ -221,7 +283,30 @@ export async function runInteractiveMode(program: Command, globalOpts: GlobalOpt
         try {
             const commandArgs = await promptMainMenu(program);
             if (commandArgs === null) break;
-            const fullArgv = [...buildGlobalFlags(globalOpts), ...commandArgs];
+
+            // Handle container selection inline — no need to shell out to a subcommand
+            if (commandArgs[0] === 'use' && commandArgs.length === 1) {
+                const chosen = await promptContainerSelect(config, currentId);
+                globalOpts.id = chosen ?? undefined;
+                if (chosen) {
+                    const rec = findContainerById(config, chosen);
+                    const label = rec ? rec.id.replace(/-/g, '').slice(0, 8) : chosen;
+                    logger.success(`Selected container: ${label}`);
+                } else {
+                    globalOpts.id = undefined;
+                    logger.success('Container selection cleared.');
+                }
+                // await pressAnyKey();
+                continue;
+            }
+            if (commandArgs[0] === 'use' && commandArgs[1] === '--clear') {
+                globalOpts.id = undefined;
+                logger.success('Container selection cleared.');
+                await pressAnyKey();
+                continue;
+            }
+
+            const fullArgv = [...buildGlobalFlags(), ...commandArgs];
             await parseAsyncInteractive(program, fullArgv);
             await pressAnyKey();
         } catch (err) {

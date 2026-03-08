@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { type Command } from 'commander';
-import { buildGlobalFlags, promptConfigGet, promptConfigSet, promptConfigReset, promptMainMenu, runInteractiveMode } from './interactive.js';
+import { buildGlobalFlags, promptConfigGet, promptConfigSet, promptConfigReset, promptMainMenu, promptContainerSelect, CONTAINER_UNSET, runInteractiveMode } from './interactive.js';
 import { DEFAULT_CONFIG_DIR } from './constants.js';
+import { type ConfigFile } from './config-store.js';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ describe('promptConfigReset', () => {
 // ─── promptMainMenu ───────────────────────────────────────────────────────────
 
 describe('promptMainMenu', () => {
-    const mockProgram = { help: vi.fn(), parseAsync: vi.fn() };
+    const mockProgram = { help: vi.fn(), parseAsync: vi.fn(), version: vi.fn().mockReturnValue('0.0.0-test') };
 
     beforeEach(() => {
         mockSelect.mockReset();
@@ -138,10 +139,30 @@ describe('promptMainMenu', () => {
     });
 });
 
+// ─── promptContainerSelect ────────────────────────────────────────────────────
+
+describe('promptContainerSelect', () => {
+    const emptyConfig: ConfigFile = { version: 1, containers: {}, settings: { defaultImage: '', defaultTag: '', authMethod: null, currentContainerId: null, gitUserName: null, gitUserEmail: null } };
+
+    beforeEach(() => {
+        mockSelect.mockReset();
+    });
+
+    it('returns null when CONTAINER_UNSET is chosen', async () => {
+        mockSelect.mockResolvedValueOnce(CONTAINER_UNSET);
+        expect(await promptContainerSelect(emptyConfig, null)).toBeNull();
+    });
+
+    it('returns the chosen container id when a container is selected', async () => {
+        mockSelect.mockResolvedValueOnce('abc-123');
+        expect(await promptContainerSelect(emptyConfig, null)).toBe('abc-123');
+    });
+});
+
 // ─── runInteractiveMode ───────────────────────────────────────────────────────
 
 describe('runInteractiveMode', () => {
-    const mockProgram = { help: vi.fn(), parseAsync: vi.fn() };
+    const mockProgram = { help: vi.fn(), parseAsync: vi.fn(), version: vi.fn().mockReturnValue('0.0.0-test') };
 
     beforeEach(() => {
         mockSelect.mockReset();
@@ -178,6 +199,32 @@ describe('runInteractiveMode', () => {
         await runInteractiveMode(mockProgram as unknown as Command, { configDir: DEFAULT_CONFIG_DIR });
         expect(mockProgram.parseAsync).toHaveBeenCalledOnce();
         expect(mockProgram.parseAsync).toHaveBeenCalledWith(['start'], { from: 'user' });
+        expect(exitSpy).toHaveBeenCalledWith(0);
+        exitSpy.mockRestore();
+    });
+
+    it('handles inline container select via "use" menu option', async () => {
+        Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
+        const exitSpy = vi.spyOn(process, 'exit').mockImplementation((_code?: number | string) => undefined as never);
+        mockSelect
+            .mockResolvedValueOnce('use')            // main menu → select container
+            .mockResolvedValueOnce(CONTAINER_UNSET)  // container picker → none
+            .mockResolvedValueOnce('__exit__');       // main menu → exit
+        await runInteractiveMode(mockProgram as unknown as Command, { configDir: DEFAULT_CONFIG_DIR });
+        expect(mockProgram.parseAsync).not.toHaveBeenCalled();
+        expect(exitSpy).toHaveBeenCalledWith(0);
+        exitSpy.mockRestore();
+    });
+
+    it('clears container selection via "use-clear" menu option', async () => {
+        Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
+        const exitSpy = vi.spyOn(process, 'exit').mockImplementation((_code?: number | string) => undefined as never);
+        const opts = { configDir: DEFAULT_CONFIG_DIR, id: 'some-id' };
+        mockSelect
+            .mockResolvedValueOnce('use-clear')  // main menu → clear selection
+            .mockResolvedValueOnce('__exit__');   // main menu → exit
+        await runInteractiveMode(mockProgram as unknown as Command, opts);
+        expect(opts.id).toBeUndefined();
         expect(exitSpy).toHaveBeenCalledWith(0);
         exitSpy.mockRestore();
     });
