@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
 import { DEFAULT_CONFIG_DIR, DEFAULT_IMAGE, DEFAULT_IMAGE_TAG, DOCKER_IMAGE_VERSION } from './constants.js';
 import { withEscBack } from './prompt-utils.js';
 import { loadConfig, type ConfigFile } from './config-store.js';
-import { findContainerById, getAllContainers } from './container-store.js';
+import { findContainerById, findContainersByWorkspace, getAllContainers } from './container-store.js';
 import { resolveWorkspace } from './workspace.js';
 import { formatContainerLine } from './selection.js';
 import { versions } from '@claude-code-sandbox/shared';
@@ -413,6 +413,18 @@ export async function runInteractiveMode(program: Command, opts: GlobalOpts): Pr
                     globalOpts.workspace = result.workspace;
                     const fullArgv = [...buildGlobalFlags(), 'start', '--image', result.image, '--tag', result.tag];
                     await parseAsyncInteractive(program, fullArgv);
+
+                    // Auto-select the newly created container
+                    const freshConfig = loadConfig(globalOpts.configDir);
+                    const newContainers = findContainersByWorkspace(freshConfig, result.workspace)
+                        .filter((c) => c.lastStatus === 'running')
+                        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+                    if (newContainers.length > 0) {
+                        globalOpts.id = newContainers[0].id;
+                        const label = newContainers[0].id.replace(/-/g, '').slice(0, 8);
+                        logger.success(`Auto-selected container: ${label}`);
+                    }
+
                     await pressAnyKey();
                 }
                 continue;
