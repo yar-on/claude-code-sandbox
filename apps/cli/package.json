@@ -16,6 +16,7 @@
         "url": "https://github.com/yar-on/claude-code-sandbox.git"
     },
     "license": "MIT",
+    "type": "module",
     "bin": {
         "claude-code-sandbox": "./dist/cli.js"
     },

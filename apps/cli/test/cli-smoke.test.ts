@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'child_process';
 import { resolve } from 'path';
 
-const CLI = resolve(import.meta.dirname, '..', 'dist', 'cli.mjs');
+const CLI = resolve(import.meta.dirname, '..', 'dist', 'cli.js');
 
 function run(args: string[], env?: Record<string, string>): { stdout: string; stderr: string; exitCode: number } {
     try {
