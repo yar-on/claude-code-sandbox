@@ -1,6 +1,6 @@
 {
     "name": "@claude-code-sandbox/cli",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "description": "CLI for managing the claude-code-sandbox Docker container",
     "keywords": [
         "claude",
