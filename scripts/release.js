@@ -110,8 +110,8 @@ async function flowVersionsUpdate(rl) {
     console.log(`  to point to the new versions defined in libs/shared/src/versions.json.`);
     if (DRY_RUN) console.log('\n  (dry run — nothing will actually happen)');
 
-    const confirm = await ask(rl, '\n  Proceed? [y/N] ');
-    if (confirm.toLowerCase() !== 'y') {
+    const confirm = await ask(rl, '\n  Proceed? [Y/n] ');
+    if (confirm.toLowerCase() === 'n') {
         console.log('\n  Aborted.\n');
         process.exit(0);
     }
@@ -198,8 +198,8 @@ async function flowVersionBump(rl, target) {
     console.log('  ─────────────────────────────────');
     if (DRY_RUN) console.log('  (dry run — nothing will actually happen)');
 
-    const confirm = await ask(rl, '\n  Proceed? [y/N] ');
-    if (confirm.toLowerCase() !== 'y') {
+    const confirm = await ask(rl, '\n  Proceed? [Y/n] ');
+    if (confirm.toLowerCase() === 'n') {
         console.log('\n  Aborted.\n');
         process.exit(0);
     }
