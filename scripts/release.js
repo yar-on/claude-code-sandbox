@@ -24,6 +24,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const DRY_RUN = process.argv.includes('--dry-run');
 const SKIP_CHECKS = process.argv.includes('--skip-checks');
+const GENERATE_README = path.join(ROOT, 'apps', 'docker', 'scripts', 'generate-readme.js');
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -122,8 +123,11 @@ async function flowVersionsUpdate(rl) {
     if (!DRY_RUN) writeJson(cliPkgPath, cliPkg);
     console.log(`\n  Updated apps/cli/package.json → ${newCliVersion}`);
 
-    // Commit (CLI package.json only — Docker package.json is unchanged)
-    run('git add apps/cli/package.json');
+    // Regenerate Docker README with current version and updated versions.json
+    run(`node ${GENERATE_README}`, { env: { ...process.env, RELEASE_VERSION: currentDockerVersion } });
+
+    // Commit (CLI package.json + regenerated README)
+    run('git add apps/cli/package.json apps/docker/README.md');
     run(`git commit -m "release: versions update — rebuild docker v${currentDockerVersion}, cli v${newCliVersion}"`);
 
     // Push commit, then tags (Docker rebuild tag first)
@@ -218,9 +222,14 @@ async function flowVersionBump(rl, target) {
         console.log(`  Updated apps/cli/package.json    → ${cliVersion}`);
     }
 
+    // Regenerate Docker README if Docker is being released
+    if (releaseDocker) {
+        run(`node ${GENERATE_README}`, { env: { ...process.env, RELEASE_VERSION: dockerVersion } });
+    }
+
     // Git commit
     const changedFiles = [];
-    if (releaseDocker) changedFiles.push('apps/docker/package.json');
+    if (releaseDocker) changedFiles.push('apps/docker/package.json', 'apps/docker/README.md');
     if (releaseCli) changedFiles.push('apps/cli/package.json');
 
     let commitMsg;

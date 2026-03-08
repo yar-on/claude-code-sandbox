@@ -6,6 +6,7 @@
     "scripts": {
         "build": "docker build -f image/Dockerfile --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) -t claude-code-sandbox .",
         "generate-matrix": "node scripts/generate-matrix.js",
+        "generate-readme": "node scripts/generate-readme.js",
         "release": "cd ../.. && release-it"
     },
     "license": "MIT",
