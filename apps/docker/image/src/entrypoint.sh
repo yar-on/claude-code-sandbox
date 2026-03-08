@@ -32,6 +32,14 @@ if [ -n "${GIT_USER_EMAIL:-}" ]; then
   git config --global user.email "${GIT_USER_EMAIL}"
 fi
 
-# exec replaces this shell with the target process, ensuring signals
-# (SIGTERM, SIGINT) are forwarded directly to claude/bash
-exec "$@"
+# Loop: restart the command after it exits so the container stays alive
+# between Claude sessions. Use Ctrl-C twice quickly to break out.
+while true; do
+  "$@"
+  exit_code=$?
+  echo ""
+  echo "  Session exited (code $exit_code). Starting a new session in 2s..."
+  echo "  Press Ctrl-C to stop the container."
+  echo ""
+  sleep 2
+done
