@@ -207,6 +207,7 @@ export async function promptMainMenu(program: Command): Promise<string[] | null>
                         new Separator('── Container Bulk Lifecycle ──'),
                         { name: 'Start all stopped containers', value: 'start-all' },
                         { name: 'Stop all running containers', value: 'stop-all' },
+                        { name: 'Remove all containers', value: 'remove-all' },
                         new Separator('── Authentication ──'),
                         { name: 'Auth setup wizard', value: 'auth-setup' },
                         { name: 'Auth status', value: 'auth-status' },
@@ -239,6 +240,7 @@ export async function promptMainMenu(program: Command): Promise<string[] | null>
                         new Separator('── Container Bulk Lifecycle ──'),
                         { name: 'Start all stopped containers', value: 'start-all' },
                         { name: 'Stop all running containers', value: 'stop-all' },
+                        { name: 'Remove all containers', value: 'remove-all' },
                         new Separator('── Authentication ──'),
                         { name: 'Auth setup wizard', value: 'auth-setup' },
                         { name: 'Auth status', value: 'auth-status' },
@@ -274,6 +276,8 @@ export async function promptMainMenu(program: Command): Promise<string[] | null>
             return ['start-all'];
         case 'stop-all':
             return ['stop-all'];
+        case 'remove-all':
+            return ['__remove-all__'];
         case 'remove':
             return ['remove'];
         case 'attach':
@@ -427,6 +431,15 @@ export async function runInteractiveMode(program: Command, opts: GlobalOpts): Pr
 
                     await pressAnyKey();
                 }
+                continue;
+            }
+
+            // Handle remove-all: run command then clear selected container
+            if (commandArgs[0] === '__remove-all__') {
+                const fullArgv = [...buildGlobalFlags(), 'remove-all'];
+                await parseAsyncInteractive(program, fullArgv);
+                globalOpts.id = undefined;
+                await pressAnyKey();
                 continue;
             }
 

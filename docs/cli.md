@@ -31,8 +31,16 @@ apps/cli/src/
 ├── commands/
 │   ├── start.ts            # claude-code-sandbox start
 │   ├── stop.ts             # claude-code-sandbox stop
+│   ├── start-all.ts        # claude-code-sandbox start-all
+│   ├── stop-all.ts         # claude-code-sandbox stop-all
+│   ├── remove.ts           # claude-code-sandbox remove
+│   ├── remove-all.ts       # claude-code-sandbox remove-all
 │   ├── status.ts           # claude-code-sandbox status
 │   ├── shell.ts            # claude-code-sandbox shell
+│   ├── attach.ts           # claude-code-sandbox attach
+│   ├── ls.ts               # claude-code-sandbox ls
+│   ├── history.ts          # claude-code-sandbox history
+│   ├── use.ts              # claude-code-sandbox use
 │   ├── auth.ts             # claude-code-sandbox auth (+ auth setup, auth status)
 │   └── config.ts           # claude-code-sandbox config (+ list, get, set, reset)
 ├── lib/
@@ -69,6 +77,32 @@ Flow:
 ```
 Options:
   --rm   Remove the container after stopping
+```
+
+### `claude-code-sandbox start-all`
+
+Starts all stopped containers. Does not create new ones.
+
+### `claude-code-sandbox stop-all`
+
+Stops all running containers.
+
+### `claude-code-sandbox remove`
+
+Removes a single container from Docker (stops it first if running). The container is preserved in history.
+
+```
+Options:
+  -f, --force   Skip confirmation prompt
+```
+
+### `claude-code-sandbox remove-all`
+
+Removes **all** containers from Docker (stops running ones first). Each container is preserved in history. Displays a list of all containers that will be removed and requires confirmation before proceeding — this action cannot be undone.
+
+```
+Options:
+  -f, --force   Skip confirmation prompt
 ```
 
 ### `claude-code-sandbox status`
