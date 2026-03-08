@@ -97,7 +97,7 @@ See [apps/cli/README.md](apps/cli/README.md) for the full CLI reference.
 
 ## Interactive Mode
 
-Running `claude-code-sandbox` with no arguments opens a looping TUI menu:
+Running `npx @claude-code-sandbox/cli` with no arguments opens a looping TUI menu:
 
 ```
   Claude Code Sandbox — Interactive Mode
