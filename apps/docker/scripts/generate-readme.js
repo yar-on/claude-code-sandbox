@@ -71,7 +71,7 @@ const pythonAliases = computeAliases(versions.python);
 const highestNode = [...versions.node].sort(compareVersions).reverse()[0];
 const highestPython = [...versions.python].sort(compareVersions).reverse()[0];
 
-const DOCKERFILE_URL = 'https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile';
+const DOCKERFILE_URL = 'https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile';
 
 // Build tag lines grouped by node+python combo
 const tagLines = [];

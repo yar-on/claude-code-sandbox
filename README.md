@@ -217,7 +217,7 @@ claude-code-sandbox/
 ### Setup
 
 ```bash
-git clone https://github.com/yar-on/claude-code-sandbox
+git clone https://github.com/spiriyu/claude-code-sandbox
 cd claude-code-sandbox
 npm install          # installs all workspace packages
 ```
@@ -257,4 +257,4 @@ Required GitHub secrets: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`
 
 ## License
 
-MIT © [yar-on](https://github.com/yar-on)
+MIT © [spiriyu](https://github.com/spiriyu)

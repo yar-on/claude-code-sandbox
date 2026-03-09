@@ -51,7 +51,7 @@ Run `npx @claude-code-sandbox/cli auth` for an interactive setup guide.
 ## Building Locally
 
 ```bash
-git clone https://github.com/yar-on/claude-code-sandbox
+git clone https://github.com/spiriyu/claude-code-sandbox
 cd claude-code-sandbox
 
 docker build -t claude-code-sandbox .

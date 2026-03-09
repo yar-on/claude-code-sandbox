@@ -10,10 +10,10 @@
         "docker",
         "cli"
     ],
-    "homepage": "https://github.com/yar-on/claude-code-sandbox",
+    "homepage": "https://github.com/spiriyu/claude-code-sandbox",
     "repository": {
         "type": "git",
-        "url": "https://github.com/yar-on/claude-code-sandbox.git"
+        "url": "https://github.com/spiriyu/claude-code-sandbox.git"
     },
     "license": "MIT",
     "type": "module",

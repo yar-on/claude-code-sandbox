@@ -4,23 +4,23 @@
 
 > Tags are prefixed with the release version at publish time (e.g. `0.4.0_node24_python3.13`). See [Build Matrix & Tagging](#build-matrix--tagging) for the full scheme.
 
-- [`latest`, `node24.14.0_python3.13`, `node24.14.0_python3`, `node24_python3.13`, `node24_python3`, `node24.14_python3.13`, `node24.14_python3`](https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
+- [`latest`, `node24.14.0_python3.13`, `node24.14.0_python3`, `node24_python3.13`, `node24_python3`, `node24.14_python3.13`, `node24.14_python3`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
-- [`node24.14.0_python3.12`, `node24_python3.12`, `node24.14_python3.12`](https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
+- [`node24.14.0_python3.12`, `node24_python3.12`, `node24.14_python3.12`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
-- [`node24.14.0_python3.11`, `node24_python3.11`, `node24.14_python3.11`](https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
+- [`node24.14.0_python3.11`, `node24_python3.11`, `node24.14_python3.11`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
-- [`node22.18.0_python3.13`, `node22.18.0_python3`, `node22_python3.13`, `node22_python3`, `node22.18_python3.13`, `node22.18_python3`](https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
+- [`node22.18.0_python3.13`, `node22.18.0_python3`, `node22_python3.13`, `node22_python3`, `node22.18_python3.13`, `node22.18_python3`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
-- [`node22.18.0_python3.12`, `node22_python3.12`, `node22.18_python3.12`](https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
+- [`node22.18.0_python3.12`, `node22_python3.12`, `node22.18_python3.12`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
-- [`node22.18.0_python3.11`, `node22_python3.11`, `node22.18_python3.11`](https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
+- [`node22.18.0_python3.11`, `node22_python3.11`, `node22.18_python3.11`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
-- [`node20.19.4_python3.13`, `node20.19.4_python3`, `node20_python3.13`, `node20_python3`, `node20.19_python3.13`, `node20.19_python3`](https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
+- [`node20.19.4_python3.13`, `node20.19.4_python3`, `node20_python3.13`, `node20_python3`, `node20.19_python3.13`, `node20.19_python3`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
-- [`node20.19.4_python3.12`, `node20_python3.12`, `node20.19_python3.12`](https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
+- [`node20.19.4_python3.12`, `node20_python3.12`, `node20.19_python3.12`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
-- [`node20.19.4_python3.11`, `node20_python3.11`, `node20.19_python3.11`](https://github.com/yar-on/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
+- [`node20.19.4_python3.11`, `node20_python3.11`, `node20.19_python3.11`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
 ## What This Image Does
 

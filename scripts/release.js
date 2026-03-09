@@ -138,8 +138,8 @@ async function flowVersionsUpdate(rl) {
     run(`git push origin cli-v${newCliVersion}`);
 
     console.log('\n  ✔ Done!\n');
-    console.log(`  Docker rebuild: https://github.com/yar-on/claude-code-sandbox/actions`);
-    console.log(`  CLI publish:    https://github.com/yar-on/claude-code-sandbox/actions`);
+    console.log(`  Docker rebuild: https://github.com/spiriyu/claude-code-sandbox/actions`);
+    console.log(`  CLI publish:    https://github.com/spiriyu/claude-code-sandbox/actions`);
     console.log('');
 }
 
@@ -252,8 +252,8 @@ async function flowVersionBump(rl, target) {
     if (releaseCli) run(`git push origin cli-v${cliVersion}`);
 
     console.log('\n  ✔ Done!\n');
-    if (releaseDocker) console.log(`  Docker build:  https://github.com/yar-on/claude-code-sandbox/actions`);
-    if (releaseCli) console.log(`  CLI publish:   https://github.com/yar-on/claude-code-sandbox/actions`);
+    if (releaseDocker) console.log(`  Docker build:  https://github.com/spiriyu/claude-code-sandbox/actions`);
+    if (releaseCli) console.log(`  CLI publish:   https://github.com/spiriyu/claude-code-sandbox/actions`);
     console.log('');
 }
 
