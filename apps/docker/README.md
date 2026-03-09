@@ -2,7 +2,7 @@
 
 ## Supported tags and respective `Dockerfile` links
 
-> Tags are prefixed with the release version at publish time (e.g. `0.4.0_node24_python3.13`). See [Build Matrix & Tagging](#build-matrix--tagging) for the full scheme.
+> Tags are prefixed with the release version at publish time (e.g. `0.5.0_node24_python3.13`). See [Build Matrix & Tagging](#build-matrix--tagging) for the full scheme.
 
 - [`latest`, `node24.14.0_python3.13`, `node24.14.0_python3`, `node24_python3.13`, `node24_python3`, `node24.14_python3.13`, `node24.14_python3`](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile)
 
@@ -113,18 +113,18 @@ CI builds the **Cartesian product** (9 combinations). Tags follow the pattern:
 
 The highest Node + highest Python combo also gets `latest` and the bare version tag.
 
-**Example tags for release `0.4.0`:**
+**Example tags for release `0.5.0`:**
 
 ```
-0.4.0_node24.14.0_python3.13   <- also tagged: latest, 0.4.0
-0.4.0_node24.14.0_python3.12
-0.4.0_node24.14.0_python3.11
-0.4.0_node22.18.0_python3.13
-0.4.0_node22.18.0_python3.12
-0.4.0_node22.18.0_python3.11
-0.4.0_node20.19.4_python3.13
-0.4.0_node20.19.4_python3.12
-0.4.0_node20.19.4_python3.11
+0.5.0_node24.14.0_python3.13   <- also tagged: latest, 0.5.0
+0.5.0_node24.14.0_python3.12
+0.5.0_node24.14.0_python3.11
+0.5.0_node22.18.0_python3.13
+0.5.0_node22.18.0_python3.12
+0.5.0_node22.18.0_python3.11
+0.5.0_node20.19.4_python3.13
+0.5.0_node20.19.4_python3.12
+0.5.0_node20.19.4_python3.11
 ```
 
 ## Quick Reference
