@@ -115,19 +115,34 @@ async function runAuthWizard(configDir: string): Promise<void> {
     if (storage === 'file') {
         mkdirSync(dirname(envFilePath), { recursive: true });
         writeFileSync(envFilePath, `${envKey}=${token}\n`, { mode: 0o600 });
-        chmodSync(envFilePath, 0o600);
+        if (process.platform !== 'win32') {
+            chmodSync(envFilePath, 0o600);
+        }
 
         const config = loadConfig(configDir);
         config.settings.authMethod = method;
         saveConfig(config, configDir);
 
         logger.success(`Credentials saved to ${envFilePath}`);
-        logger.info('The file is only readable by you (chmod 600).');
+        if (process.platform === 'win32') {
+            logger.info('On Windows, restrict access to this file via its Properties > Security settings.');
+        } else {
+            logger.info('The file is only readable by you (chmod 600).');
+        }
     } else {
         logger.blank();
-        console.log('  Add this to your shell profile (~/.bashrc or ~/.zshrc):');
-        console.log();
-        console.log(chalk.cyan(`  export ${envKey}=${maskToken(token)}`));
+        if (process.platform === 'win32') {
+            console.log('  Add this to your PowerShell profile ($PROFILE):');
+            console.log();
+            console.log(chalk.cyan(`  $env:${envKey} = "your-token-here"`));
+            console.log();
+            console.log('  Or set it permanently for all sessions:');
+            console.log(chalk.cyan(`  setx ${envKey} "your-token-here"`));
+        } else {
+            console.log('  Add this to your shell profile (~/.bashrc or ~/.zshrc):');
+            console.log();
+            console.log(chalk.cyan(`  export ${envKey}=${maskToken(token)}`));
+        }
         console.log();
         logger.warn('The token above is masked — paste your actual token.');
     }

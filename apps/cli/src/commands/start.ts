@@ -53,8 +53,9 @@ export function makeStartCommand(): Command {
             // Check Docker
             if (!(await isDockerRunning())) {
                 logger.error('Docker is not running or not accessible.');
-                console.log('  On Linux: sudo systemctl start docker');
-                console.log('  On macOS: open Docker Desktop');
+                console.log('  On Linux:   sudo systemctl start docker');
+                console.log('  On macOS:   open Docker Desktop');
+                console.log('  On Windows: Start Docker Desktop from the Start menu');
                 process.exit(1);
             }
 

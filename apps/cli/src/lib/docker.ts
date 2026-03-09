@@ -3,6 +3,20 @@ import { mkdirSync } from 'fs';
 import { type ContainerStatus } from './config-store.js';
 import { CONTAINER_NAME_PREFIX, WORKSPACE_MOUNT_PATH, CLAUDE_DIR_CONTAINER_PATH, GIT_ENV_VARS } from './constants.js';
 
+/**
+ * Convert a host path to a Docker-compatible bind-mount path.
+ * On Windows, backslashes must become forward slashes so the Docker API accepts them
+ * (e.g. "C:\Users\foo" → "C:/Users/foo"). No-op on Linux/macOS.
+ */
+export function toDockerPath(p: string): string {
+    return process.platform === 'win32' ? p.replace(/\\/g, '/') : p;
+}
+
+/** Returns true if the current stdin supports raw mode (not available on some Windows terminals). */
+function hasRawMode(): boolean {
+    return process.stdin.isTTY && typeof process.stdin.setRawMode === 'function';
+}
+
 let _client: Docker | null = null;
 
 export function getDockerClient(): Docker {
@@ -111,7 +125,7 @@ export async function createAndStartContainer(opts: CreateContainerOptions): Pro
             ...(opts.gitUserEmail ? [`${GIT_ENV_VARS.USER_EMAIL}=${opts.gitUserEmail}`] : []),
         ],
         HostConfig: {
-            Binds: [`${opts.workspace}:${WORKSPACE_MOUNT_PATH}`, `${opts.claudeDir}:${CLAUDE_DIR_CONTAINER_PATH}`],
+            Binds: [`${toDockerPath(opts.workspace)}:${WORKSPACE_MOUNT_PATH}`, `${toDockerPath(opts.claudeDir)}:${CLAUDE_DIR_CONTAINER_PATH}`],
             AutoRemove: false,
         },
     });
@@ -144,7 +158,8 @@ export async function attachToContainer(name: string): Promise<void> {
         });
     });
 
-    if (process.stdin.isTTY) {
+    const rawMode = hasRawMode();
+    if (rawMode) {
         process.stdin.setRawMode(true);
         // Forward terminal resize events
         const resizeHandler = () => {
@@ -165,7 +180,7 @@ export async function attachToContainer(name: string): Promise<void> {
     await new Promise<void>((resolve) => stream.once('end', resolve));
 
     process.stdin.unpipe(stream);
-    if (process.stdin.isTTY) process.stdin.setRawMode(false);
+    if (rawMode) process.stdin.setRawMode(false);
 }
 
 /** Open a new login bash session in a running container via exec. */
@@ -183,7 +198,8 @@ export async function execShellInContainer(name: string): Promise<void> {
 
     const stream = await exec.start({ hijack: true, stdin: true });
 
-    if (process.stdin.isTTY) {
+    const rawMode = hasRawMode();
+    if (rawMode) {
         process.stdin.setRawMode(true);
         const resizeHandler = () => {
             exec.resize({ h: process.stdout.rows, w: process.stdout.columns }).catch(() => {});
@@ -199,7 +215,7 @@ export async function execShellInContainer(name: string): Promise<void> {
     await new Promise<void>((resolve) => stream.once('end', resolve));
 
     process.stdin.unpipe(stream);
-    if (process.stdin.isTTY) process.stdin.setRawMode(false);
+    if (rawMode) process.stdin.setRawMode(false);
 }
 
 /** Derive the short ID (first 8 hex chars) from a UUID. */

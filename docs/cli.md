@@ -4,6 +4,22 @@ Source: `apps/cli/`
 Package: `@claude-code-sandbox/cli`
 Binary: `claude-code-sandbox`
 
+## Platform Support
+
+The CLI runs on **Linux**, **macOS**, and **Windows**.
+
+### Windows prerequisites
+
+- **Docker Desktop for Windows** (WSL2 backend recommended)
+- **Node.js 18+**
+- **Windows Terminal** (recommended) — required for full TTY support in `attach` and `shell` commands. Plain CMD / PowerShell do not support raw mode; the commands will still run but interactive key handling may be limited.
+
+### Windows notes
+
+- Workspace bind-mount paths are automatically converted from Windows format (`C:\Users\…`) to the forward-slash format Docker Desktop expects (`C:/Users/…`).
+- The `.env` credentials file is created without POSIX `chmod 600` (not supported on NTFS). Restrict access manually via the file's Properties > Security settings.
+- The `attach` and `shell` commands require a ConPTY-capable terminal (Windows Terminal 1.0+) for proper interactive sessions.
+
 ## Development Commands
 
 ```bash

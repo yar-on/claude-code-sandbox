@@ -17,13 +17,6 @@ import { makeConfigCommand } from './commands/config.js';
 import { DEFAULT_CONFIG_DIR, ENV_VARS } from './lib/constants.js';
 import { runInteractiveMode } from './lib/interactive.js';
 
-// OS guard — Windows is not supported
-if (process.platform === 'win32') {
-    console.error('\x1b[31m✗\x1b[0m claude-code-sandbox does not support Windows.');
-    console.error('  Docker socket access and path handling require Linux or macOS.');
-    process.exit(1);
-}
-
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
 
