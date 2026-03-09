@@ -154,6 +154,8 @@ export async function attachToContainer(name: string): Promise<void> {
         stream.once('end', () => {
             process.stdout.off('resize', resizeHandler);
         });
+        // Trigger immediate repaint by signalling current size
+        container.resize({ h: process.stdout.rows, w: process.stdout.columns }).catch(() => {});
     }
 
     process.stdin.resume();

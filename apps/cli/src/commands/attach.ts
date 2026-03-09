@@ -32,6 +32,8 @@ export function makeAttachCommand(): Command {
             process.exit(1);
         }
 
+        // eslint-disable-next-line no-console
+        console.clear();
         console.log(chalk.gray(`[Attached to ${container.name}]`));
         console.log(chalk.gray('[Ctrl+C to exit]'));
 
