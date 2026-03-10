@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.5.4] - 2026-03-10
+
 ### Added
 
 - Workspace backup system — automatic zip backups before container start
@@ -89,7 +93,8 @@ Initial public release.
 
 ---
 
-[unreleased]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.5.3...HEAD
+[unreleased]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.5.4...HEAD
+[0.5.4]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.5.3...cli-v0.5.4
 [0.5.3]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.5.2...cli-v0.5.3
 [0.5.2]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.5.1...cli-v0.5.2
 [0.5.1]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.5.0...cli-v0.5.1
