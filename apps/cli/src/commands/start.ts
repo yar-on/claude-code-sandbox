@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { join } from 'path';
 import { logger, spinner } from '../utils/logger.js';
 import { validateWorkspace, validateImageName, validateTag } from '../utils/validation.js';
+import { createBackup } from '../lib/backup.js';
 import { loadConfig, saveConfig, type ContainerRecord } from '../lib/config-store.js';
 import { getAllContainers, addContainer, findContainersByWorkspace, syncContainerStatuses, updateContainer } from '../lib/container-store.js';
 import { resolveWorkspace } from '../lib/workspace.js';
@@ -25,6 +26,7 @@ export function makeStartCommand(): Command {
         .option('--pull', 'Force pull image before starting')
         .option('--image <image>', 'Docker image name')
         .option('--tag <tag>', 'Docker image tag')
+        .option('--backup <value>', 'Backup workspace before starting (true/false/1/0)')
         .action(async function (this: Command) {
             const g = this.optsWithGlobals();
 
@@ -74,6 +76,34 @@ export function makeStartCommand(): Command {
                 console.log('    CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...');
                 console.log('\n  Or run: claude-code-sandbox auth setup');
                 process.exit(1);
+            }
+
+            // Backup workspace if enabled
+            const backupRaw = g.backup as string | undefined;
+            const backupEnabled =
+                backupRaw === undefined
+                    ? config.settings.backup
+                    : backupRaw === 'true' || backupRaw === '1'
+                      ? true
+                      : backupRaw === 'false' || backupRaw === '0'
+                        ? false
+                        : config.settings.backup;
+
+            if (backupEnabled) {
+                const spin = spinner('Backing up workspace...').start();
+                try {
+                    const meta = await createBackup(configDir, workspace, (msg) => {
+                        spin.text = msg;
+                    });
+                    if (meta) {
+                        const mb = (meta.sizeBytes / 1024 / 1024).toFixed(1);
+                        spin.succeed(`Workspace backed up (${mb} MB)`);
+                    } else {
+                        spin.info('Backup skipped (recent backup already exists)');
+                    }
+                } catch (err) {
+                    spin.warn(`Backup failed: ${(err as Error).message} — continuing`);
+                }
             }
 
             // Check if --id points to a specific container

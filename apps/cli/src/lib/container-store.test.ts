@@ -21,7 +21,7 @@ function emptyConfig(): ConfigFile {
     return {
         version: 1,
         containers: {},
-        settings: { defaultImage: 'test', defaultTag: 'latest', authMethod: null, currentContainerId: null, gitUserName: null, gitUserEmail: null, cleanupDays: 10 },
+        settings: { defaultImage: 'test', defaultTag: 'latest', authMethod: null, currentContainerId: null, gitUserName: null, gitUserEmail: null, cleanupDays: 10, backup: true },
     };
 }
 

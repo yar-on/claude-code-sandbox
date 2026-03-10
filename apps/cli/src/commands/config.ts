@@ -2,22 +2,22 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { join } from 'path';
 import { logger } from '../utils/logger.js';
-import { loadConfig, saveConfig } from '../lib/config-store.js';
+import { loadConfig, saveConfig, DEFAULT_CLEANUP_DAYS, DEFAULT_BACKUP } from '../lib/config-store.js';
 import { DEFAULT_IMAGE, DEFAULT_IMAGE_TAG } from '../lib/constants.js';
-import { DEFAULT_CLEANUP_DAYS } from '../lib/config-store.js';
 import { validateImageName, validateTag } from '../utils/validation.js';
 
-type SettingsKey = 'defaultImage' | 'defaultTag' | 'authMethod' | 'gitUserName' | 'gitUserEmail' | 'cleanupDays';
+type SettingsKey = 'defaultImage' | 'defaultTag' | 'authMethod' | 'gitUserName' | 'gitUserEmail' | 'cleanupDays' | 'backup';
 
-const VALID_KEYS: SettingsKey[] = ['defaultImage', 'defaultTag', 'authMethod', 'gitUserName', 'gitUserEmail', 'cleanupDays'];
+const VALID_KEYS: SettingsKey[] = ['defaultImage', 'defaultTag', 'authMethod', 'gitUserName', 'gitUserEmail', 'cleanupDays', 'backup'];
 
-const DEFAULTS: Record<SettingsKey, string | number | null> = {
+const DEFAULTS: Record<SettingsKey, string | number | boolean | null> = {
     defaultImage: DEFAULT_IMAGE,
     defaultTag: DEFAULT_IMAGE_TAG,
     authMethod: null,
     gitUserName: null,
     gitUserEmail: null,
     cleanupDays: DEFAULT_CLEANUP_DAYS,
+    backup: DEFAULT_BACKUP,
 };
 
 function validateValue(key: SettingsKey, value: string): string | null {
@@ -32,6 +32,11 @@ function validateValue(key: SettingsKey, value: string): string | null {
         const n = parseInt(value, 10);
         if (isNaN(n) || n < 0) {
             return `cleanupDays must be a non-negative integer`;
+        }
+    }
+    if (key === 'backup') {
+        if (!['true', 'false'].includes(value)) {
+            return `backup must be "true" or "false"`;
         }
     }
     return null;
@@ -54,6 +59,7 @@ export function makeConfigCommand(): Command {
                 gitUserName: s.gitUserName,
                 gitUserEmail: s.gitUserEmail,
                 cleanupDays: s.cleanupDays,
+                backup: s.backup,
             };
 
             if (opts.json) {
@@ -108,9 +114,10 @@ export function makeConfigCommand(): Command {
             }
 
             const config = loadConfig(String(g.configDir));
-            let parsed: string | number | null = value === 'null' ? null : value;
+            let parsed: string | number | boolean | null = value === 'null' ? null : value;
             if (key === 'cleanupDays') parsed = parseInt(value, 10);
-            (config.settings as unknown as Record<string, string | number | null>)[key] = parsed;
+            if (key === 'backup') parsed = value === 'true';
+            (config.settings as unknown as Record<string, string | number | boolean | null>)[key] = parsed;
             saveConfig(config, String(g.configDir));
             logger.success(`Set ${key} = ${value}`);
         });
@@ -126,7 +133,7 @@ export function makeConfigCommand(): Command {
                     process.exit(1);
                 }
                 const config = loadConfig(String(g.configDir));
-                (config.settings as unknown as Record<string, string | null>)[key] = DEFAULTS[key as SettingsKey];
+                (config.settings as unknown as Record<string, string | number | boolean | null>)[key] = DEFAULTS[key as SettingsKey];
                 saveConfig(config, String(g.configDir));
                 logger.success(`Reset ${key} to default.`);
                 return;
@@ -142,6 +149,7 @@ export function makeConfigCommand(): Command {
                 config.settings.gitUserName = null;
                 config.settings.gitUserEmail = null;
                 config.settings.cleanupDays = DEFAULT_CLEANUP_DAYS;
+                config.settings.backup = DEFAULT_BACKUP;
                 saveConfig(config, String(g.configDir));
                 logger.success('All settings reset to defaults.');
             } else {

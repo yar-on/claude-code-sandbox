@@ -47,6 +47,11 @@ export const WORKSPACE_MOUNT_PATH = '/workspace';
 export const CLAUDE_DIR_CONTAINER_PATH = '/home/dev/.claude';
 
 // Git identity env vars passed into the container
+// Backup
+export const BACKUPS_DIR_NAME = 'backups';
+export const BACKUP_MAX_COUNT = 2;
+export const BACKUP_MIN_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 export const GIT_ENV_VARS = {
     USER_NAME: 'GIT_USER_NAME',
     USER_EMAIL: 'GIT_USER_EMAIL',

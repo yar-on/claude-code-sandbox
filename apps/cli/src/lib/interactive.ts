@@ -2,12 +2,13 @@ import chalk from 'chalk';
 import { existsSync, statSync } from 'fs';
 import { resolve, join } from 'path';
 import { type Command } from 'commander';
-import { logger } from '../utils/logger.js';
+import { logger, spinner } from '../utils/logger.js';
 import { appLogger } from '../utils/app-logger.js';
 import { DEFAULT_CONFIG_DIR, DEFAULT_IMAGE, DEFAULT_IMAGE_TAG, DOCKER_IMAGE_VERSION } from './constants.js';
 import { withEscBack } from './prompt-utils.js';
-import { loadConfig, type ConfigFile } from './config-store.js';
+import { loadConfig, saveConfig, type ConfigFile, type WorkspaceSettings } from './config-store.js';
 import { findContainerById, findContainersByWorkspace, getAllContainers } from './container-store.js';
+import { createBackup, deleteWorkspaceBackups, estimateWorkspaceSize, backupDirForWorkspace, loadBackupIndex } from './backup.js';
 import { getStoredAuth } from '../commands/auth.js';
 import { resolveWorkspace } from './workspace.js';
 import { formatContainerLine } from './selection.js';
@@ -63,6 +64,7 @@ const CONFIG_KEYS = [
     { name: 'gitUserName', value: 'gitUserName' },
     { name: 'gitUserEmail', value: 'gitUserEmail' },
     { name: 'cleanupDays', value: 'cleanupDays' },
+    { name: 'backup', value: 'backup' },
 ];
 
 export async function promptConfigGet(): Promise<string[]> {
@@ -97,17 +99,171 @@ export async function promptConfigReset(): Promise<string[]> {
     return ['config', 'reset', key];
 }
 
+// ── Formatting helpers ────────────────────────────────────────────────────────
+
+function formatBytes(bytes: number): string {
+    if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+    if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+    return `${(bytes / 1e3).toFixed(0)} KB`;
+}
+
+function formatDuration(seconds: number): string {
+    if (seconds < 60) return `~${Math.round(seconds)}s`;
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return s > 0 ? `~${m}m ${s}s` : `~${m}m`;
+}
+
+// ── One-time backup migration prompt ─────────────────────────────────────────
+
+/**
+ * Shown once when the user first upgrades to a version with per-workspace
+ * backup settings. Lists all workspaces that don't have a decision yet and
+ * lets the user choose which ones to enable. Never shown again after completion
+ * or if the user ESCs out and comes back — ESC defers it to next launch.
+ */
+export async function promptBackupMigration(configDir: string): Promise<void> {
+    const { checkbox } = await getPrompts();
+
+    // No config dir → fresh install, nothing to migrate
+    if (!existsSync(configDir)) return;
+
+    const config = loadConfig(configDir);
+    if (config.backupMigrationDone) return;
+
+    // Workspaces from non-removed containers that have no decision yet
+    const workspaces = [
+        ...new Set(
+            getAllContainers(config)
+                .filter((c) => c.removedAt === null)
+                .map((c) => c.workspace)
+        ),
+    ].filter((ws) => !(ws in config.workspaceSettings) && existsSync(ws) && statSync(ws).isDirectory());
+
+    // Nothing to decide — just mark done silently
+    if (workspaces.length === 0) {
+        config.backupMigrationDone = true;
+        saveConfig(config, configDir);
+        return;
+    }
+
+    logger.blank();
+    console.log(chalk.yellow.bold('  ⚠  One-time backup setup'));
+    console.log(chalk.dim('  These workspaces have no backup preference. Choose which to enable.'));
+    console.log(chalk.dim('  Selected workspaces will be backed up now before entering the menu.'));
+    logger.blank();
+
+    const choices = workspaces.map((ws) => {
+        const { bytes, estimatedSeconds } = estimateWorkspaceSize(ws);
+        return {
+            name: `${ws}  ${chalk.dim(`(${formatBytes(bytes)} · ${formatDuration(estimatedSeconds)})`)}`,
+            value: ws,
+            checked: true,
+        };
+    });
+
+    let selected: string[];
+    try {
+        selected = await withEscBack((s) => checkbox<string>({ message: 'Enable automatic backups for:', choices }, { signal: s }));
+    } catch (err) {
+        // ESC or Ctrl+C — defer migration to next launch
+        if ((err as Error).name === 'BackError' || (err as Error).name === 'ExitPromptError') return;
+        throw err;
+    }
+
+    const selectedSet = new Set(selected);
+    for (const ws of workspaces) {
+        config.workspaceSettings[ws] = { backup: selectedSet.has(ws) };
+    }
+    config.backupMigrationDone = true;
+    saveConfig(config, configDir);
+
+    for (const ws of selected) {
+        const spin = spinner(`Backing up ${ws}...`).start();
+        try {
+            await createBackup(configDir, ws, (msg) => {
+                spin.text = msg;
+            });
+            spin.succeed(`Backed up: ${ws}`);
+        } catch (err) {
+            spin.fail(`Backup failed: ${ws}`);
+            appLogger.error('Migration backup failed', { workspace: ws, error: String(err) });
+        }
+    }
+}
+
+// ── Per-workspace backup settings ────────────────────────────────────────────
+
+export async function promptWorkspaceBackupSettings(configDir: string, workspace: string): Promise<void> {
+    const { select, confirm } = await getPrompts();
+
+    const config = loadConfig(configDir);
+    const current = config.workspaceSettings[workspace]?.backup ?? config.settings.backup;
+
+    logger.blank();
+    console.log(chalk.bold('  Workspace Backup Settings'));
+    console.log(chalk.gray('  Workspace : ') + chalk.cyan(workspace));
+    console.log(chalk.gray('  Current   : ') + (current ? chalk.green('enabled') : chalk.red('disabled')));
+    logger.blank();
+
+    const updated = await withEscBack((s) =>
+        select<boolean>(
+            {
+                message: 'Automatic backups for this workspace:',
+                choices: [
+                    { name: 'Enabled', value: true },
+                    { name: 'Disabled', value: false },
+                ],
+                default: current,
+            },
+            { signal: s }
+        )
+    );
+
+    config.workspaceSettings[workspace] = { backup: updated };
+
+    if (current && !updated) {
+        const backupDir = backupDirForWorkspace(configDir, workspace);
+        const entries = loadBackupIndex(backupDir);
+        if (entries.length > 0) {
+            const totalBytes = entries.reduce((sum, e) => sum + e.sizeBytes, 0);
+            logger.blank();
+            const doDelete = await withEscBack((s) =>
+                confirm(
+                    {
+                        message: `Delete ${entries.length} existing backup(s) for this workspace? (${formatBytes(totalBytes)})`,
+                        default: false,
+                    },
+                    { signal: s }
+                )
+            );
+            if (doDelete) {
+                deleteWorkspaceBackups(configDir, workspace);
+                logger.success('Backups deleted.');
+            }
+        }
+    }
+
+    saveConfig(config, configDir);
+    logger.success(`Backup ${updated ? 'enabled' : 'disabled'} for ${workspace}`);
+}
+
 export interface StartWizardResult {
     workspace: string;
     image: string;
     tag: string;
+    backup: boolean;
 }
 
 /**
  * Multi-step wizard for deploying a new container.
  * Returns the workspace, image, and tag if confirmed, or null if cancelled.
  */
-export async function startWizard(currentWorkspace: string, settings: ConfigFile['settings']): Promise<StartWizardResult | null> {
+export async function startWizard(
+    currentWorkspace: string,
+    settings: ConfigFile['settings'],
+    workspaceSettings: Record<string, WorkspaceSettings>
+): Promise<StartWizardResult | null> {
     const { select, input, confirm } = await getPrompts();
 
     // ── Step 1: Workspace ──
@@ -158,7 +314,11 @@ export async function startWizard(currentWorkspace: string, settings: ConfigFile
         tag = imageChoice;
     }
 
-    // ── Step 3: Confirmation ──
+    // ── Step 3: Backup ──
+    const backupDefault = workspaceSettings[workspace]?.backup ?? settings.backup;
+    const doBackup = await withEscBack((s) => confirm({ message: 'Backup workspace before starting?', default: backupDefault }, { signal: s }));
+
+    // ── Step 4: Confirmation ──
     const imageRef = `${image}:${tag}`;
     logger.blank();
     console.log(chalk.bold('  Container Summary'));
@@ -166,6 +326,7 @@ export async function startWizard(currentWorkspace: string, settings: ConfigFile
     console.log(chalk.gray('  Image     : ') + chalk.cyan(image));
     console.log(chalk.gray('  Tag       : ') + chalk.cyan(tag));
     console.log(chalk.gray('  Full ref  : ') + chalk.cyan(imageRef));
+    console.log(chalk.gray('  Backup    : ') + chalk.cyan(doBackup ? 'yes' : 'no'));
     logger.blank();
 
     const confirmed = await withEscBack((s) => confirm({ message: 'Deploy this container?', default: true }, { signal: s }));
@@ -175,7 +336,7 @@ export async function startWizard(currentWorkspace: string, settings: ConfigFile
         return null;
     }
 
-    return { workspace, image, tag };
+    return { workspace, image, tag, backup: doBackup };
 }
 
 /**
@@ -228,6 +389,7 @@ export async function promptMainMenu(program: Command): Promise<string[] | null>
                         { name: 'Remove selected container', value: 'remove' },
                         { name: 'Attach to Claude Code process', value: 'attach' },
                         { name: 'Open bash session', value: 'shell' },
+                        { name: 'Manage workspace backups', value: 'workspace-backup' },
                         { name: 'List containers', value: 'ls' },
                         { name: 'List all history (including removed)', value: 'history' },
                         new Separator('── Container Bulk Lifecycle ──'),
@@ -281,6 +443,8 @@ export async function promptMainMenu(program: Command): Promise<string[] | null>
             return ['attach'];
         case 'shell':
             return ['shell'];
+        case 'workspace-backup':
+            return ['__workspace-backup__'];
         case 'ls':
             return ['ls'];
         case 'history':
@@ -363,6 +527,8 @@ export async function runInteractiveMode(program: Command, opts: GlobalOpts): Pr
 
     appLogger.info('Interactive session started', { workspace: opts.workspace, configDir: opts.configDir });
 
+    await promptBackupMigration(globalOpts.configDir);
+
     while (true) {
         logger.blank();
         const cliVersion = program.version() ?? 'unknown';
@@ -438,15 +604,17 @@ export async function runInteractiveMode(program: Command, opts: GlobalOpts): Pr
                     await pressAnyKey();
                     continue;
                 }
-                const result = await startWizard(workspace, config.settings);
+                const result = await startWizard(workspace, config.settings, config.workspaceSettings);
                 if (result) {
                     appLogger.info('Start wizard completed', { workspace: result.workspace, image: result.image, tag: result.tag });
                     globalOpts.workspace = result.workspace;
-                    const fullArgv = [...buildGlobalFlags(), 'start', '--image', result.image, '--tag', result.tag];
+                    const fullArgv = [...buildGlobalFlags(), 'start', '--image', result.image, '--tag', result.tag, '--backup', String(result.backup)];
                     await parseAsyncInteractive(program, fullArgv);
 
-                    // Auto-select the newly created container
+                    // Persist the backup preference chosen in the wizard
                     const freshConfig = loadConfig(globalOpts.configDir);
+                    freshConfig.workspaceSettings[result.workspace] = { backup: result.backup };
+                    saveConfig(freshConfig, globalOpts.configDir);
                     const newContainers = findContainersByWorkspace(freshConfig, result.workspace)
                         .filter((c) => c.lastStatus === 'running')
                         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -462,6 +630,13 @@ export async function runInteractiveMode(program: Command, opts: GlobalOpts): Pr
                 } else {
                     appLogger.info('Start wizard cancelled');
                 }
+                continue;
+            }
+
+            // Handle workspace backup settings
+            if (commandArgs[0] === '__workspace-backup__') {
+                await promptWorkspaceBackupSettings(globalOpts.configDir, workspace);
+                await pressAnyKey();
                 continue;
             }
 

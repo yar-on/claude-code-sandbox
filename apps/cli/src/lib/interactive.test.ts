@@ -16,16 +16,18 @@ import { type ConfigFile } from './config-store.js';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-const { mockSelect, mockInput, mockConfirm } = vi.hoisted(() => ({
+const { mockSelect, mockInput, mockConfirm, mockCheckbox } = vi.hoisted(() => ({
     mockSelect: vi.fn<[], Promise<string>>(),
     mockInput: vi.fn<[], Promise<string>>(),
     mockConfirm: vi.fn<[], Promise<boolean>>(),
+    mockCheckbox: vi.fn<[], Promise<string[]>>().mockResolvedValue([]),
 }));
 
 vi.mock('@inquirer/prompts', () => ({
     select: mockSelect,
     input: mockInput,
     confirm: mockConfirm,
+    checkbox: mockCheckbox,
     Separator: class {
         readonly separator: string;
         readonly type = 'separator';
@@ -37,6 +39,11 @@ vi.mock('@inquirer/prompts', () => ({
 
 vi.mock('../utils/logger.js', () => ({
     logger: { info: vi.fn(), success: vi.fn(), warn: vi.fn(), error: vi.fn(), line: vi.fn(), blank: vi.fn() },
+    spinner: vi.fn(() => {
+        const s = { text: '', start: vi.fn(), succeed: vi.fn(), fail: vi.fn() };
+        s.start = vi.fn(() => s);
+        return s;
+    }),
 }));
 
 // ─── buildGlobalFlags ─────────────────────────────────────────────────────────
@@ -190,7 +197,9 @@ describe('promptContainerSelect', () => {
     const emptyConfig: ConfigFile = {
         version: 1,
         containers: {},
-        settings: { defaultImage: '', defaultTag: '', authMethod: null, currentContainerId: null, gitUserName: null, gitUserEmail: null, cleanupDays: 10 },
+        settings: { defaultImage: '', defaultTag: '', authMethod: null, currentContainerId: null, gitUserName: null, gitUserEmail: null, cleanupDays: 10, backup: true },
+        workspaceSettings: {},
+        backupMigrationDone: true,
     };
 
     beforeEach(() => {
@@ -219,6 +228,7 @@ describe('startWizard', () => {
         gitUserName: null,
         gitUserEmail: null,
         cleanupDays: 10,
+        backup: true,
     };
 
     beforeEach(() => {
@@ -227,16 +237,18 @@ describe('startWizard', () => {
         mockConfirm.mockReset();
     });
 
-    it('returns workspace, image, and tag for latest selection', async () => {
+    it('returns workspace, image, tag, and backup for latest selection', async () => {
         mockInput.mockResolvedValueOnce('/tmp'); // workspace
         mockSelect.mockResolvedValueOnce('latest'); // image tag
-        mockConfirm.mockResolvedValueOnce(true); // confirm
+        mockConfirm.mockResolvedValueOnce(true); // backup
+        mockConfirm.mockResolvedValueOnce(true); // deploy confirm
 
-        const result = await startWizard('/tmp', defaultSettings);
+        const result = await startWizard('/tmp', defaultSettings, {});
         expect(result).toEqual({
             workspace: '/tmp',
             image: 'spiriyu/claude-code-sandbox',
             tag: 'latest',
+            backup: true,
         });
     });
 
@@ -245,28 +257,31 @@ describe('startWizard', () => {
         mockSelect.mockResolvedValueOnce('__custom__'); // custom image
         mockSelect.mockResolvedValueOnce('22'); // node 22
         mockSelect.mockResolvedValueOnce('3.12'); // python 3.12
-        mockConfirm.mockResolvedValueOnce(true); // confirm
+        mockConfirm.mockResolvedValueOnce(false); // backup
+        mockConfirm.mockResolvedValueOnce(true); // deploy confirm
 
-        const result = await startWizard('/tmp', defaultSettings);
+        const result = await startWizard('/tmp', defaultSettings, {});
         expect(result).not.toBeNull();
         expect(result?.workspace).toBe('/tmp');
         expect(result?.image).toBe('spiriyu/claude-code-sandbox');
         expect(result?.tag).toMatch(/^.+_node22_python3\.12$/);
+        expect(result?.backup).toBe(false);
     });
 
-    it('returns null when user declines confirmation', async () => {
+    it('returns null when user declines deploy confirmation', async () => {
         mockInput.mockResolvedValueOnce('/tmp'); // workspace
         mockSelect.mockResolvedValueOnce('latest'); // image tag
-        mockConfirm.mockResolvedValueOnce(false); // decline
+        mockConfirm.mockResolvedValueOnce(true); // backup
+        mockConfirm.mockResolvedValueOnce(false); // decline deploy
 
-        const result = await startWizard('/tmp', defaultSettings);
+        const result = await startWizard('/tmp', defaultSettings, {});
         expect(result).toBeNull();
     });
 
     it('returns null when workspace does not exist', async () => {
         mockInput.mockResolvedValueOnce('/nonexistent/path/abc123');
 
-        const result = await startWizard('/tmp', defaultSettings);
+        const result = await startWizard('/tmp', defaultSettings, {});
         expect(result).toBeNull();
     });
 
@@ -274,13 +289,15 @@ describe('startWizard', () => {
         const settingsWithTag = { ...defaultSettings, defaultTag: 'latest_node22_python3.11' };
         mockInput.mockResolvedValueOnce('/tmp');
         mockSelect.mockResolvedValueOnce('latest_node22_python3.11'); // pick settings tag
-        mockConfirm.mockResolvedValueOnce(true);
+        mockConfirm.mockResolvedValueOnce(true); // backup
+        mockConfirm.mockResolvedValueOnce(true); // deploy confirm
 
-        const result = await startWizard('/tmp', settingsWithTag);
+        const result = await startWizard('/tmp', settingsWithTag, {});
         expect(result).toEqual({
             workspace: '/tmp',
             image: 'spiriyu/claude-code-sandbox',
             tag: 'latest_node22_python3.11',
+            backup: true,
         });
     });
 });
@@ -293,6 +310,9 @@ describe('runInteractiveMode', () => {
     beforeEach(() => {
         mockSelect.mockReset();
         mockInput.mockReset();
+        mockConfirm.mockReset();
+        mockCheckbox.mockReset();
+        mockCheckbox.mockResolvedValue([]); // migration: no backups selected by default
         mockProgram.help.mockReset();
         mockProgram.parseAsync.mockReset();
     });

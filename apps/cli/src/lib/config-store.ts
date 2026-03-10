@@ -24,15 +24,23 @@ export interface Settings {
     gitUserName: string | null;
     gitUserEmail: string | null;
     cleanupDays: number;
+    backup: boolean;
+}
+
+export interface WorkspaceSettings {
+    backup: boolean;
 }
 
 export interface ConfigFile {
     version: 1;
     containers: Record<string, ContainerRecord>;
     settings: Settings;
+    workspaceSettings: Record<string, WorkspaceSettings>;
+    backupMigrationDone: boolean;
 }
 
 export const DEFAULT_CLEANUP_DAYS = 10;
+export const DEFAULT_BACKUP = true;
 
 const DEFAULT_SETTINGS: Settings = {
     defaultImage: DEFAULT_IMAGE,
@@ -42,10 +50,11 @@ const DEFAULT_SETTINGS: Settings = {
     gitUserName: null,
     gitUserEmail: null,
     cleanupDays: DEFAULT_CLEANUP_DAYS,
+    backup: DEFAULT_BACKUP,
 };
 
 function createEmpty(): ConfigFile {
-    return { version: 1, containers: {}, settings: { ...DEFAULT_SETTINGS } };
+    return { version: 1, containers: {}, settings: { ...DEFAULT_SETTINGS }, workspaceSettings: {}, backupMigrationDone: false };
 }
 
 function migrate(raw: unknown): ConfigFile {
@@ -66,7 +75,14 @@ function migrate(raw: unknown): ConfigFile {
             gitUserName: s.gitUserName ?? null,
             gitUserEmail: s.gitUserEmail ?? null,
             cleanupDays: typeof s.cleanupDays === 'number' ? s.cleanupDays : DEFAULT_CLEANUP_DAYS,
+            backup: typeof s.backup === 'boolean' ? s.backup : DEFAULT_BACKUP,
         };
+    }
+    if (obj.workspaceSettings && typeof obj.workspaceSettings === 'object') {
+        result.workspaceSettings = obj.workspaceSettings as Record<string, WorkspaceSettings>;
+    }
+    if (typeof obj.backupMigrationDone === 'boolean') {
+        result.backupMigrationDone = obj.backupMigrationDone;
     }
     return result;
 }

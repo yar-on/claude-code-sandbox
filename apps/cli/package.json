@@ -34,6 +34,7 @@
         "test:watch": "vitest"
     },
     "dependencies": {
+        "archiver": "7.0.1",
         "chalk": "^5.3.0",
         "commander": "^12.1.0",
         "dockerode": "^4.0.2",
@@ -44,6 +45,7 @@
     },
     "devDependencies": {
         "@claude-code-sandbox/shared": "*",
+        "@types/archiver": "7.0.0",
         "@types/dockerode": "^3.3.32",
         "@types/node": "^22.0.0",
         "tsup": "^8.3.0",
