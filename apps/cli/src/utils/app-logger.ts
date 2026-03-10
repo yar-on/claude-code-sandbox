@@ -28,24 +28,21 @@ function buildFileTransport(logDir: string): DailyRotateFile {
 }
 
 // Lazily initialised — first call to any log method triggers setup.
-let _transport: DailyRotateFile | null = null;
-
-function getTransport(): DailyRotateFile {
-    if (!_transport) {
-        const session = getSession();
-        const logDir = join(session.configDir ?? DEFAULT_CONFIG_DIR, 'logs');
-        _transport = buildFileTransport(logDir);
-    }
-    return _transport;
-}
+let _logger: ReturnType<typeof createLogger> | null = null;
 
 function getLogger() {
-    return createLogger({
-        level: 'debug',
-        transports: [getTransport()],
-        // Never write to stdout/stderr — terminal output stays in logger.ts.
-        silent: false,
-    });
+    if (!_logger) {
+        const session = getSession();
+        const logDir = join(session.configDir ?? DEFAULT_CONFIG_DIR, 'logs');
+        const transport = buildFileTransport(logDir);
+        _logger = createLogger({
+            level: 'debug',
+            transports: [transport],
+            // Never write to stdout/stderr — terminal output stays in logger.ts.
+            silent: false,
+        });
+    }
+    return _logger;
 }
 
 export const appLogger = {
