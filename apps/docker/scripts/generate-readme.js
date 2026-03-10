@@ -72,6 +72,7 @@ const highestNode = [...versions.node].sort(compareVersions).reverse()[0];
 const highestPython = [...versions.python].sort(compareVersions).reverse()[0];
 
 const DOCKERFILE_URL = 'https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/image/Dockerfile';
+const CHANGELOG_URL = 'https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/CHANGELOG.md';
 
 // Build tag lines grouped by node+python combo
 const tagLines = [];
@@ -121,6 +122,8 @@ const comboCount = versions.node.length * versions.python.length;
 // ── generate README ──────────────────────────────────────────────────────────
 
 const readme = `# Docker Image Overview
+
+[![Changelog](https://img.shields.io/badge/changelog-view-blue)](${CHANGELOG_URL})
 
 ## Supported tags and respective \`Dockerfile\` links
 

@@ -25,6 +25,9 @@ const ROOT = path.resolve(__dirname, '..');
 const DRY_RUN = process.argv.includes('--dry-run');
 const SKIP_CHECKS = process.argv.includes('--skip-checks');
 const GENERATE_README = path.join(ROOT, 'apps', 'docker', 'scripts', 'generate-readme.js');
+const DOCKER_CHANGELOG = path.join(ROOT, 'apps', 'docker', 'CHANGELOG.md');
+const CLI_CHANGELOG = path.join(ROOT, 'apps', 'cli', 'CHANGELOG.md');
+const GITHUB_REPO = 'https://github.com/spiriyu/claude-code-sandbox';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +73,54 @@ function run(cmd, opts = {}) {
     if (!DRY_RUN) {
         execSync(cmd, { cwd: ROOT, stdio: 'inherit', ...opts });
     }
+}
+
+// ── changelog helpers ─────────────────────────────────────────────────────────
+
+function todayISO() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Promotes [Unreleased] to [newVersion] in a Keep-a-Changelog file:
+ *   - Moves [Unreleased] content into a dated version section
+ *   - Resets [Unreleased] to empty
+ *   - Updates/inserts the comparison links at the bottom
+ *
+ * @param {string} changelogPath  Absolute path to CHANGELOG.md
+ * @param {string} newVersion     The version being released (e.g. "0.6.0")
+ * @param {string} prevVersion    The previous version (for comparison links)
+ * @param {string} [defaultBody]  Fallback body if [Unreleased] is empty
+ */
+function updateChangelog(changelogPath, newVersion, prevVersion, defaultBody) {
+    if (!fs.existsSync(changelogPath)) return;
+
+    let content = fs.readFileSync(changelogPath, 'utf8');
+    const date = todayISO();
+    const app = changelogPath.includes(`${path.sep}cli${path.sep}`) ? 'cli' : 'docker';
+    const newTag = `${app}-v${newVersion}`;
+    const prevTag = `${app}-v${prevVersion}`;
+
+    // Extract body between ## [Unreleased] and the first following ---
+    const unreleasedRe = /## \[Unreleased\]\n([\s\S]*?)\n---/;
+    const match = content.match(unreleasedRe);
+    if (match) {
+        const body = match[1].trim() || defaultBody || 'No user-facing changes.';
+        const versionSection = `## [${newVersion}] - ${date}\n\n${body}`;
+        content = content.replace(unreleasedRe, `## [Unreleased]\n\n---\n\n${versionSection}\n\n---`);
+    }
+
+    // Update [unreleased] comparison link to point at new tag
+    content = content.replace(/^\[unreleased\]:.*$/im, `[unreleased]: ${GITHUB_REPO}/compare/${newTag}...HEAD`);
+
+    // Insert new version link directly after the [unreleased] line
+    const newLink = `[${newVersion}]: ${GITHUB_REPO}/compare/${prevTag}...${newTag}`;
+    content = content.replace(/^(\[unreleased\]:.*\n)/im, `$1${newLink}\n`);
+
+    console.log(`  Updated ${path.relative(ROOT, changelogPath)} → [${newVersion}]`);
+    if (!DRY_RUN) fs.writeFileSync(changelogPath, content, 'utf8');
 }
 
 // ── prompt helpers ────────────────────────────────────────────────────────────
@@ -123,11 +174,14 @@ async function flowVersionsUpdate(rl) {
     if (!DRY_RUN) writeJson(cliPkgPath, cliPkg);
     console.log(`\n  Updated apps/cli/package.json → ${newCliVersion}`);
 
+    // Update CLI changelog (versions rebuild — use default note if [Unreleased] is empty)
+    updateChangelog(CLI_CHANGELOG, newCliVersion, currentCliVersion, 'Updated Node.js and Python runtime versions.');
+
     // Regenerate Docker README with current version and updated versions.json
     run(`node ${GENERATE_README}`, { env: { ...process.env, RELEASE_VERSION: currentDockerVersion } });
 
-    // Commit (CLI package.json + regenerated README)
-    run('git add apps/cli/package.json apps/docker/README.md');
+    // Commit (CLI package.json + changelog + regenerated README)
+    run('git add apps/cli/package.json apps/cli/CHANGELOG.md apps/docker/README.md');
     run(`git commit -m "release: versions update — rebuild docker v${currentDockerVersion}, cli v${newCliVersion}"`);
 
     // Push commit, then tags (Docker rebuild tag first)
@@ -149,6 +203,10 @@ async function flowVersionBump(rl, target) {
 
     const dockerPkgPath = path.join(ROOT, 'apps', 'docker', 'package.json');
     const cliPkgPath = path.join(ROOT, 'apps', 'cli', 'package.json');
+
+    // Read current versions before bumping (needed for changelog comparison links)
+    const prevDockerVersion = readJson(dockerPkgPath).version;
+    const prevCliVersion = readJson(cliPkgPath).version;
 
     let dockerVersion, cliVersion;
 
@@ -222,6 +280,10 @@ async function flowVersionBump(rl, target) {
         console.log(`  Updated apps/cli/package.json    → ${cliVersion}`);
     }
 
+    // Update changelogs
+    if (releaseDocker) updateChangelog(DOCKER_CHANGELOG, dockerVersion, prevDockerVersion);
+    if (releaseCli) updateChangelog(CLI_CHANGELOG, cliVersion, prevCliVersion);
+
     // Regenerate Docker README if Docker is being released
     if (releaseDocker) {
         run(`node ${GENERATE_README}`, { env: { ...process.env, RELEASE_VERSION: dockerVersion } });
@@ -229,8 +291,8 @@ async function flowVersionBump(rl, target) {
 
     // Git commit
     const changedFiles = [];
-    if (releaseDocker) changedFiles.push('apps/docker/package.json', 'apps/docker/README.md');
-    if (releaseCli) changedFiles.push('apps/cli/package.json');
+    if (releaseDocker) changedFiles.push('apps/docker/package.json', 'apps/docker/README.md', 'apps/docker/CHANGELOG.md');
+    if (releaseCli) changedFiles.push('apps/cli/package.json', 'apps/cli/CHANGELOG.md');
 
     let commitMsg;
     if (releaseDocker && releaseCli) {

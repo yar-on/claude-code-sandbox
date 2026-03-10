@@ -1,5 +1,7 @@
 # Docker Image Overview
 
+[![Changelog](https://img.shields.io/badge/changelog-view-blue)](https://github.com/spiriyu/claude-code-sandbox/blob/main/apps/docker/CHANGELOG.md)
+
 ## Supported tags and respective `Dockerfile` links
 
 > Tags are prefixed with the release version at publish time (e.g. `0.5.1_node24_python3.13`). See [Build Matrix & Tagging](#build-matrix--tagging) for the full scheme.

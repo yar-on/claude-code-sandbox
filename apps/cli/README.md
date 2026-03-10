@@ -3,6 +3,7 @@
 CLI for managing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) Docker sandbox containers.
 
 [![npm](https://img.shields.io/npm/v/@claude-code-sandbox/cli)](https://www.npmjs.com/package/@claude-code-sandbox/cli)
+[![Changelog](https://img.shields.io/badge/changelog-view-blue)](CHANGELOG.md)
 
 ---
 
