@@ -134,26 +134,17 @@ function formatTimestamp(d: Date): string {
     return d.toISOString().replace(/[-:]/g, '').slice(0, 15);
 }
 
-export async function createBackup(configDir: string, workspacePath: string, onProgress?: (msg: string) => void): Promise<BackupMeta | null> {
-    if (!existsSync(workspacePath) || !statSync(workspacePath).isDirectory()) {
-        return null;
-    }
-
+async function runBackup(configDir: string, workspacePath: string, onProgress?: (msg: string) => void): Promise<BackupMeta> {
     const backupDir = backupDirForWorkspace(configDir, workspacePath);
     mkdirSync(backupDir, { recursive: true });
 
     const entries = loadBackupIndex(backupDir);
-    const check = shouldSkipBackup(entries);
-    if (check.skip) {
-        return null;
-    }
-
     const slug = workspaceSlug(workspacePath);
     const ts = formatTimestamp(new Date());
     const filename = `${ts}_${slug}.zip`;
     const filePath = join(backupDir, filename);
 
-    onProgress?.('Backing up workspace...');
+    onProgress?.(`Backing up ${workspacePath}...`);
 
     await new Promise<void>((resolve, reject) => {
         const output = createWriteStream(filePath);
@@ -169,7 +160,7 @@ export async function createBackup(configDir: string, workspacePath: string, onP
             reject(err);
         });
         archive.on('progress', ({ entries: e }) => {
-            onProgress?.(`Backing up workspace... (${e.processed} files)`);
+            onProgress?.(`Backing up ${workspacePath}... (${e.processed} files)`);
         });
 
         archive.pipe(output);
@@ -194,4 +185,29 @@ export async function createBackup(configDir: string, workspacePath: string, onP
     saveBackupIndex(backupDir, entries);
 
     return meta;
+}
+
+export async function createBackup(configDir: string, workspacePath: string, onProgress?: (msg: string) => void): Promise<BackupMeta | null> {
+    if (!existsSync(workspacePath) || !statSync(workspacePath).isDirectory()) {
+        return null;
+    }
+
+    const backupDir = backupDirForWorkspace(configDir, workspacePath);
+    mkdirSync(backupDir, { recursive: true });
+
+    const entries = loadBackupIndex(backupDir);
+    const check = shouldSkipBackup(entries);
+    if (check.skip) {
+        return null;
+    }
+
+    return runBackup(configDir, workspacePath, onProgress);
+}
+
+/** Like createBackup but skips the minimum-age check — used for manual "Backup now" and startup forced backups. */
+export async function createBackupForced(configDir: string, workspacePath: string, onProgress?: (msg: string) => void): Promise<BackupMeta | null> {
+    if (!existsSync(workspacePath) || !statSync(workspacePath).isDirectory()) {
+        return null;
+    }
+    return runBackup(configDir, workspacePath, onProgress);
 }

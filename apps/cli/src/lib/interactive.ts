@@ -8,7 +8,7 @@ import { DEFAULT_CONFIG_DIR, DEFAULT_IMAGE, DEFAULT_IMAGE_TAG, DOCKER_IMAGE_VERS
 import { withEscBack } from './prompt-utils.js';
 import { loadConfig, saveConfig, type ConfigFile, type WorkspaceSettings } from './config-store.js';
 import { findContainerById, findContainersByWorkspace, getAllContainers } from './container-store.js';
-import { createBackup, deleteWorkspaceBackups, estimateWorkspaceSize, backupDirForWorkspace, loadBackupIndex } from './backup.js';
+import { createBackup, createBackupForced, deleteWorkspaceBackups, estimateWorkspaceSize, backupDirForWorkspace, loadBackupIndex, shouldSkipBackup } from './backup.js';
 import { getStoredAuth } from '../commands/auth.js';
 import { resolveWorkspace } from './workspace.js';
 import { formatContainerLine } from './selection.js';
@@ -203,26 +203,67 @@ export async function promptWorkspaceBackupSettings(configDir: string, workspace
     logger.blank();
     console.log(chalk.bold('  Workspace Backup Settings'));
     console.log(chalk.gray('  Workspace : ') + chalk.cyan(workspace));
-    console.log(chalk.gray('  Current   : ') + (current ? chalk.green('enabled') : chalk.red('disabled')));
+    console.log(chalk.gray('  Auto      : ') + (current ? chalk.green('enabled') : chalk.red('disabled')));
     logger.blank();
 
-    const updated = await withEscBack((s) =>
-        select<boolean>(
+    const action = await withEscBack((s) =>
+        select<string>(
             {
-                message: 'Automatic backups for this workspace:',
+                message: 'Workspace backup management:',
                 choices: [
-                    { name: 'Enabled', value: true },
-                    { name: 'Disabled', value: false },
+                    { name: 'Enable automatic backups', value: 'enable' },
+                    { name: 'Disable automatic backups', value: 'disable' },
+                    { name: 'Backup now', value: 'now' },
                 ],
-                default: current,
             },
             { signal: s }
         )
     );
 
-    config.workspaceSettings[workspace] = { backup: updated };
+    if (action === 'now') {
+        const spin = spinner(`Backing up ${workspace}...`).start();
+        try {
+            const meta = await createBackupForced(configDir, workspace, (msg) => {
+                spin.text = msg;
+            });
+            if (meta) {
+                const mb = (meta.sizeBytes / 1024 / 1024).toFixed(1);
+                spin.succeed(`Workspace backed up (${mb} MB)`);
+            } else {
+                spin.warn('Backup skipped (workspace not found)');
+            }
+        } catch (err) {
+            spin.fail(`Backup failed: ${(err as Error).message}`);
+        }
+        return;
+    }
 
-    if (current && !updated) {
+    const updated = action === 'enable';
+    config.workspaceSettings[workspace] = { backup: updated };
+    saveConfig(config, configDir);
+
+    if (updated && !current) {
+        // Newly enabled: create a backup now if no backup exists within last 7 days
+        const backupDir = backupDirForWorkspace(configDir, workspace);
+        const entries = loadBackupIndex(backupDir);
+        const { skip } = shouldSkipBackup(entries);
+        if (!skip) {
+            const spin = spinner(`Backing up ${workspace}...`).start();
+            try {
+                const meta = await createBackupForced(configDir, workspace, (msg) => {
+                    spin.text = msg;
+                });
+                if (meta) {
+                    const mb = (meta.sizeBytes / 1024 / 1024).toFixed(1);
+                    spin.succeed(`Initial backup created (${mb} MB)`);
+                } else {
+                    spin.info('Backup skipped (workspace not found)');
+                }
+            } catch (err) {
+                spin.warn(`Initial backup failed: ${(err as Error).message}`);
+            }
+        }
+    } else if (!updated && current) {
         const backupDir = backupDirForWorkspace(configDir, workspace);
         const entries = loadBackupIndex(backupDir);
         if (entries.length > 0) {
@@ -244,8 +285,7 @@ export async function promptWorkspaceBackupSettings(configDir: string, workspace
         }
     }
 
-    saveConfig(config, configDir);
-    logger.success(`Backup ${updated ? 'enabled' : 'disabled'} for ${workspace}`);
+    logger.success(`Automatic backup ${updated ? 'enabled' : 'disabled'} for ${workspace}`);
 }
 
 export interface StartWizardResult {
@@ -515,6 +555,49 @@ async function pressAnyKey(): Promise<void> {
     process.stdout.write('\n');
 }
 
+async function runStartupAutoBackups(configDir: string): Promise<void> {
+    if (!existsSync(configDir)) return;
+
+    const config = loadConfig(configDir);
+
+    // Collect workspaces that have auto-backup enabled and are overdue
+    const workspaces = [
+        ...new Set(
+            getAllContainers(config)
+                .filter((c) => c.removedAt === null)
+                .map((c) => c.workspace)
+        ),
+    ].filter((ws) => {
+        const enabled = config.workspaceSettings[ws]?.backup ?? config.settings.backup;
+        if (!enabled) return false;
+        if (!existsSync(ws) || !statSync(ws).isDirectory()) return false;
+        const backupDir = backupDirForWorkspace(configDir, ws);
+        const entries = loadBackupIndex(backupDir);
+        const { skip } = shouldSkipBackup(entries);
+        return !skip;
+    });
+
+    if (workspaces.length === 0) return;
+
+    for (const ws of workspaces) {
+        const spin = spinner(`Auto-backup: ${ws}...`).start();
+        try {
+            const meta = await createBackup(configDir, ws, (msg) => {
+                spin.text = msg;
+            });
+            if (meta) {
+                const mb = (meta.sizeBytes / 1024 / 1024).toFixed(1);
+                spin.succeed(`Auto-backup done: ${ws} (${mb} MB)`);
+            } else {
+                spin.stop();
+            }
+        } catch (err) {
+            spin.warn(`Auto-backup failed: ${ws} — ${(err as Error).message}`);
+            appLogger.error('Startup auto-backup failed', { workspace: ws, error: String(err) });
+        }
+    }
+}
+
 export async function runInteractiveMode(program: Command, opts: GlobalOpts): Promise<void> {
     if (!process.stdin.isTTY) {
         program.help();
@@ -528,6 +611,7 @@ export async function runInteractiveMode(program: Command, opts: GlobalOpts): Pr
     appLogger.info('Interactive session started', { workspace: opts.workspace, configDir: opts.configDir });
 
     await promptBackupMigration(globalOpts.configDir);
+    await runStartupAutoBackups(globalOpts.configDir);
 
     while (true) {
         logger.blank();

@@ -316,37 +316,51 @@ describe('createBackup', () => {
         expect(second).toBeNull();
     }, 15_000);
 
-    it('enforces max 2 backups, deleting the oldest on the third run', async () => {
+    it('enforces max 4 backups, deleting the oldest on the fifth run', async () => {
         writeFileSync(join(workspace, 'file.txt'), 'data');
 
         const backupDir = backupDirForWorkspace(configDir, workspace);
 
-        // Manually inject two old entries so rotation triggers on the next real backup
+        // Manually inject four old entries so rotation triggers on the next real backup
         const oldEntry1 = meta({
-            createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+            createdAt: new Date(Date.now() - 50 * 24 * 60 * 60 * 1000).toISOString(),
             workspace,
             filePath: join(backupDir, 'old1.zip'),
         });
         const oldEntry2 = meta({
-            createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+            createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
             workspace,
             filePath: join(backupDir, 'old2.zip'),
+        });
+        const oldEntry3 = meta({
+            createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+            workspace,
+            filePath: join(backupDir, 'old3.zip'),
+        });
+        const oldEntry4 = meta({
+            createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+            workspace,
+            filePath: join(backupDir, 'old4.zip'),
         });
 
         mkdirSync(backupDir, { recursive: true });
         writeFileSync(oldEntry1.filePath, 'dummy');
         writeFileSync(oldEntry2.filePath, 'dummy');
-        saveBackupIndex(backupDir, [oldEntry1, oldEntry2]);
+        writeFileSync(oldEntry3.filePath, 'dummy');
+        writeFileSync(oldEntry4.filePath, 'dummy');
+        saveBackupIndex(backupDir, [oldEntry1, oldEntry2, oldEntry3, oldEntry4]);
 
         const newMeta = await createBackup(configDir, workspace);
         expect(newMeta).not.toBeNull();
         if (newMeta === null) return;
 
         const index = loadBackupIndex(backupDir);
-        expect(index).toHaveLength(2);
+        expect(index).toHaveLength(4);
         const paths = index.map((e) => e.filePath);
         expect(paths).not.toContain(oldEntry1.filePath);
         expect(paths).toContain(oldEntry2.filePath);
+        expect(paths).toContain(oldEntry3.filePath);
+        expect(paths).toContain(oldEntry4.filePath);
         expect(paths).toContain(newMeta.filePath);
     }, 15_000);
 

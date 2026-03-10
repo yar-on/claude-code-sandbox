@@ -90,7 +90,7 @@ export function makeStartCommand(): Command {
                         : config.settings.backup;
 
             if (backupEnabled) {
-                const spin = spinner('Backing up workspace...').start();
+                const spin = spinner(`Backing up ${workspace}...`).start();
                 try {
                     const meta = await createBackup(configDir, workspace, (msg) => {
                         spin.text = msg;
