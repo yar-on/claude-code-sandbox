@@ -1,0 +1,22 @@
+services:
+  sandbox:
+    build:
+      context: ./apps/docker
+      dockerfile: image/Dockerfile
+      args:
+        USER_UID: "${UID:-1000}"
+        USER_GID: "${GID:-1000}"
+    image: claude-code-sandbox:dev
+    container_name: claude-code-sandbox-dev
+    env_file:
+      - path: "${HOME}/.claude-code-sandbox/.env"
+        required: false
+    volumes:
+      - .:/workspace
+    stdin_open: true
+    tty: true
+    restart: "no"
+    # Override CMD to keep the container alive for interactive testing.
+    # The entrypoint still runs and validates auth credentials.
+    # Use `docker:dev:attach` to open a shell inside the running container.
+    command: ["sleep", "infinity"]

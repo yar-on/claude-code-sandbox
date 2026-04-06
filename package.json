@@ -19,6 +19,8 @@
         "cli:type-check": "npm run type-check --workspace=apps/cli",
         "docker:build": "npm run build --workspace=apps/docker",
         "docker:generate-matrix": "npm run generate-matrix --workspace=apps/docker",
+        "docker:dev:run": "docker compose -f docker-compose.dev.yml up -d --build",
+        "docker:dev:attach": "docker exec -it claude-code-sandbox-dev bash -l",
         "lint:fix": "npm run lint:fix --workspaces --if-present",
         "fix": "npm run lint:fix && npm run format",
         "format": "prettier --write \"**/*.{ts,js,json,md}\" --ignore-path .prettierignore",
