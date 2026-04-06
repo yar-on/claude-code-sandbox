@@ -9,6 +9,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.6.3] - 2026-04-07
+
+No user-facing changes.
+
+---
+
 ## [0.6.2] - 2026-04-07
 
 No user-facing changes.
@@ -117,7 +123,8 @@ Initial public release.
 
 ---
 
-[unreleased]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.6.2...HEAD
+[unreleased]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.6.3...HEAD
+[0.6.3]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.6.2...cli-v0.6.3
 [0.6.2]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.6.1...cli-v0.6.2
 [0.6.1]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.6.0...cli-v0.6.1
 [0.6.0]: https://github.com/spiriyu/claude-code-sandbox/compare/cli-v0.5.5...cli-v0.6.0
