@@ -1,6 +1,6 @@
 {
     "name": "@spiriyu/claude-code-sandbox-docker",
-    "version": "0.5.1",
+    "version": "0.6.0",
     "private": true,
     "description": "Docker image for claude-code-sandbox",
     "scripts": {
