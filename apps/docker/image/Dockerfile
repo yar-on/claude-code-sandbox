@@ -101,9 +101,11 @@ RUN curl -fsSL https://pyenv.run | bash \
     && pyenv rehash
 
 # ---- Claude Code CLI ----
-RUN . "${NVM_DIR}/nvm.sh" \
-    && npm install -g @anthropic-ai/claude-code \
-    && npm cache clean --force
+# adding claude installed directory into PATH (ENV so it applies to subsequent RUN steps too)
+ENV PATH="/home/dev/.local/bin:${PATH}"
+RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/dev/.bashrc
+RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN claude install
 
 # ---- Claude bootstrap src (skips onboarding, no personal data) ----
 COPY --chown=dev:dev image/src/.claude.json /home/dev/.claude.json
@@ -118,5 +120,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # ---- Entrypoint + default command ----
 # ENTRYPOINT validates auth then execs CMD.
 # Override CMD to run a different process (e.g. bash for debugging).
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
 CMD ["bash", "-lc", "claude --dangerously-skip-permissions"]

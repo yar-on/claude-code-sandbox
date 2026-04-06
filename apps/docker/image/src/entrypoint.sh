@@ -32,9 +32,13 @@ if [ -n "${GIT_USER_EMAIL:-}" ]; then
   git config --global user.email "${GIT_USER_EMAIL}"
 fi
 
+# Remove marketplace invalid arguments
+#necp ~/.claude.json ~/.claude.json.bak && jq 'with_entries(select(.key | startswith("officialMarketplace") | not))' ~/.claude.json.bak > ~/.claude.json
+
 # Loop: restart the command after it exits so the container stays alive
 # between Claude sessions. Use Ctrl-C twice quickly to break out.
 while true; do
+  claude update
   "$@"
   exit_code=$?
   echo ""
